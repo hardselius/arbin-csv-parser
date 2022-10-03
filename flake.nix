@@ -1,5 +1,5 @@
 {
-  description = "Arbin CSV parser";
+  description = "NOVO Energy Data Playground";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -48,7 +48,7 @@
               cargo
               cargo-edit
               # cargo-generate
-              cargo-watch
+              # cargo-watch
               rust-analyzer
 
               # system dependencies
@@ -58,6 +58,7 @@
               libiconv
               CoreServices
               SystemConfiguration
+              CoreText
             ]);
 
             RUST_BACKTRACE = 1;
