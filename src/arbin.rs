@@ -2,10 +2,24 @@ use anyhow::Result;
 use polars::prelude::*;
 use std::path::Path;
 
-pub fn parse(path: impl AsRef<Path>) -> Result<LazyFrame> {
-    let mut lf = LazyCsvReader::new(path).with_parse_dates(true).finish()?;
+pub fn parse(path: impl AsRef<Path>, channel: u32) -> Result<LazyFrame> {
+    let mut schema = Schema::new();
+    schema.with_column("Discharge Capacity (Ah)".to_string(), DataType::Float64);
+
+    let mut lf = LazyCsvReader::new(path)
+        .with_schema(Arc::new(schema))
+        .with_parse_dates(true)
+        .with_schema_modify(|schema| {
+            let mut schema = schema.clone();
+            schema.with_column("Discharge Capacity (Ah)".to_string(), DataType::Float64);
+            schema.with_column("Discharge Energy (Wh)".to_string(), DataType::Float64);
+            Ok(schema)
+        })?
+        .finish()?;
 
     lf = lf
+        .with_column(lit(channel).alias("channel_number"))
+        .with_column(lit("arbin").alias("cycler_type"))
         .select(&[
             col("*").exclude(["Date Time"]),
             col("Date Time")
@@ -23,14 +37,36 @@ pub fn parse(path: impl AsRef<Path>) -> Result<LazyFrame> {
                     TimeUnit::Milliseconds,
                     Some("Europe/Stockholm".to_string()),
                 ))
-                .alias("datetime"),
+                .alias("observed_at"),
         ])
         .select(&[
-            col("*").exclude(["datetime"]),
-            (col("datetime").cast(DataType::Int64) / lit(1000) - lit(7200)).alias("timestamp"),
+            col("*"),
+            (col("observed_at").cast(DataType::Int64) / lit(1000) - lit(7200)).alias("timestamp"),
         ]);
 
     lf = calculate_step_capacities_and_types(lf);
+    lf = lf.select(&[
+        col("sequence_number"),
+        ((col("Test Time (s)") * lit(1000.0)).cast(DataType::Int64)).alias("total_time_millis"),
+        ((col("Step Time (s)") * lit(1000.0)).cast(DataType::Int64)).alias("step_time_millis"),
+        col("voltage"),
+        col("current"),
+        col("power"),
+        col("step_amp_hours"),
+        col("step_charged_amp_hours"),
+        col("step_discharged_amp_hours"),
+        col("step_watt_hours"),
+        col("step_charged_watt_hours"),
+        col("step_discharged_watt_hours"),
+        col("total_cycle"),
+        col("step_number"),
+        col("step_type"),
+        col("step_id"),
+        col("channel_number"),
+        col("cycler_type"),
+        col("timestamp"),
+        // col("observed_at"), // TODO: this thing crashes.
+    ]);
     Ok(lf)
 }
 

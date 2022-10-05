@@ -17,10 +17,7 @@ pub fn parse(path: impl AsRef<Path>) -> Result<LazyFrame> {
             col("datetime")
                 .str()
                 .strptime(StrpTimeOptions {
-                    date_dtype: DataType::Datetime(
-                        TimeUnit::Milliseconds,
-                        Some("UTC".to_string()),
-                    ),
+                    date_dtype: DataType::Datetime(TimeUnit::Milliseconds, Some("UTC".to_string())),
                     fmt: Some("%+".to_string()),
                     strict: true,
                     exact: true,
@@ -44,22 +41,21 @@ pub fn parse(path: impl AsRef<Path>) -> Result<LazyFrame> {
 
     lf = lf.select(&[
         col("*").exclude(["datetime"]),
-        (col("datetime").cast(DataType::Int64) / lit(1000) * lit(1000)).cast(DataType::Datetime(TimeUnit::Milliseconds, Some("UTC".to_string()))),
+        (col("datetime").cast(DataType::Int64) / lit(1000) * lit(1000)).cast(DataType::Datetime(
+            TimeUnit::Milliseconds,
+            Some("UTC".to_string()),
+        )),
     ]);
 
-
     let mut df = lf.collect()?;
-    println!("{}", df);
-    df = df
-        .upsample_stable(
-            &["group"],
-            "datetime",
-            Duration::parse("1s"),
-            Duration::parse("0s"),
-        )?;
+    df = df.upsample_stable(
+        &["group"],
+        "datetime",
+        Duration::parse("1s"),
+        Duration::parse("0s"),
+    )?;
 
     df = df.fill_null(FillNullStrategy::Backward(None))?;
-    println!("{}", df);
 
     lf = df.lazy().select(&[
         col("*").exclude(["group"]),
